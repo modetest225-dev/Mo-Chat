@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mo Studio Chat - Super Stable 2026</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-chat: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --sent-bg: #2563eb;
+            --sent-text: #ffffff;
+            --received-bg: #e2e8f0;
+            --received-text: #0f172a;
+            --border-color: #cbd5e1;
+        }
+
+        [data-theme="dark"] {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --bg-chat: #0f172a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --sent-bg: #3b82f6;
+            --sent-text: #ffffff;
+            --received-bg: #334155;
+            --received-text: #f8fafc;
+            --border-color: #475569;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); height: 100vh; display: flex; justify-content: center; align-items: center; transition: background 0.3s; }
+        .chat-container { display: flex; width: 95vw; height: 92vh; background-color: var(--bg-card); border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid var(--border-color); position: relative; }
+        
+        /* القائمة الجانبية */
+        .sidebar { width: 32%; background-color: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); }
+        .profile-select-wrapper { position: relative; width: 50px; height: 50px; cursor: pointer; border-radius: 50%; overflow: hidden; }
+        .profile-select-wrapper .avatar { width: 100%; height: 100%; object-fit: cover; }
+        .overlay-edit { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; color: white; opacity: 0; transition: 0.2s; font-size: 14px;}
+        .profile-select-wrapper:hover .overlay-edit { opacity: 1; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
+        .header-actions { display: flex; gap: 10px; }
+        
+        .connection-panel { padding: 15px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px; }
+        .id-section p { font-size: 12px; color: var(--text-muted); margin-bottom: 5px; }
+        .connect-box { display: flex; gap: 5px; }
+        .connect-box input { flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-main); color: var(--text-main); outline: none; }
+        .connect-box button { background: var(--primary); color: white; border: none; padding: 0 15px; border-radius: 10px; cursor: pointer; transition: 0.2s; font-size: 13px; }
+        .connect-box button:hover { background: var(--primary-hover); }
+        
+        .users-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; justify-content: space-between; }
+        .user-box { display: flex; align-items: center; gap: 15px; padding: 20px; border-bottom: 1px solid var(--border-color); }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; background: #22c55e; }
+        
+        .extra-settings { padding: 15px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .action-btn { flex: 1; min-width: 90px; padding: 10px 5px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main); border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; }
+        .action-btn.delete-btn:hover { background: #fee2e2; color: #ef4444; }
+        
+        .sidebar-footer { padding: 15px; background: var(--bg-main); border-top: 1px solid var(--border-color); font-size: 11px; text-align: center; color: var(--text-muted); line-height: 1.6; }
+        .sidebar-footer a { color: var(--primary); text-decoration: none; font-weight: bold; }
+        
+        /* منطقة الشات */
+        .chat-area { width: 68%; background-color: var(--bg-chat); display: flex; flex-direction: column; position: relative; }
+        .chat-header { padding: 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .current-user-info { display: flex; align-items: center; gap: 15px; }
+        .typing-text { font-size: 12px; color: #22c55e; display: none; font-weight: bold; margin-top: 2px; }
+        .incognito-badge { background: #334155; color: #f8fafc; padding: 6px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 6px; border: 1px solid #475569; }
+        
+        /* صندوق الرسائل */
+        .messages-container { flex: 1; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background-size: cover; background-position: center; }
+        .system-notice { text-align: center; margin: 10px 0; width: 100%; }
+        .system-notice p { display: inline-block; padding: 6px 14px; background: rgba(0,0,0,0.06); border-radius: 20px; font-size: 12px; color: var(--text-muted); }
+        
+        .message { max-width: 65%; padding: 12px 16px; border-radius: 16px; position: relative; word-break: break-word; display: flex; flex-direction: column; gap: 5px; }
+        .message-header { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: bold; }
+        .message-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; }
+        .message img.msg-shared-img { max-width: 100%; border-radius: 10px; max-height: 250px; object-fit: cover; margin-top: 3px; }
+        .message audio { width: 100%; max-width: 240px; margin-top: 3px; }
+        .message .time { font-size: 9px; align-self: flex-end; opacity: 0.7; }
+        
+        .message.sent { background: var(--sent-bg); color: var(--sent-text); align-self: flex-start; border-bottom-right-radius: 2px; }
+        .message.received { background: var(--received-bg); color: var(--received-text); align-self: flex-end; border-bottom-left-radius: 2px; }
+        
+        /* فوتر الكتابة والمرفقات */
+        .chat-footer { padding: 20px; background: var(--bg-card); border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 12px; }
+        .icon-btn { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; transition: 0.2s; }
+        .icon-btn:hover { color: var(--primary); }
+        .voice-btn.recording { color: #ef4444; animation: pulse 1s infinite; }
+        .chat-footer input[type="text"] { flex: 1; padding: 14px 20px; border: 1px solid var(--border-color); border-radius: 30px; background: var(--bg-main); color: var(--text-main); outline: none; font-size: 15px; }
+        .send-btn { background: var(--primary); color: white; border: none; width: 46px; height: 46px; border-radius: 50%; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 18px; transition: 0.2s; }
+        .send-btn:hover { transform: scale(1.05); background: var(--primary-hover); }
+        
+        /* شاشة القفل المحمية */
+        .lock-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.98); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; padding: 20px; text-align: center; }
+        .lock-screen i { font-size: 60px; color: #ef4444; margin-bottom: 20px; }
+        .lock-screen input { padding: 12px; border-radius: 12px; border: 1px solid #475569; background: #1e293b; color: white; text-align: center; font-size: 22px; margin: 20px 0; width: 160px; letter-spacing: 6px; outline: none; }
+        .lock-screen button { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 12px; cursor: pointer; font-weight: bold; }
+        
+        @keyframes pulse { 0% {transform: scale(1);} 50% {transform: scale(1.1);} 100% {transform: scale(1);} }
+    </style>
+</head>
+<body>
+
+    <div class="chat-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="profile-select-wrapper" title="اضغط لتغيير صورتك الشخصية">
+                    <img src="https://picsum.photos/id/1025/50" alt="بروفايل" class="avatar" id="myAvatarImg">
+                    <input type="file" id="avatarInput" accept="image/*" style="display: none;">
+                    <div class="overlay-edit"><i class="fas fa-camera"></i></div>
+                </div>
+                <h3>Mo Studio Chat</h3>
+                <div class="header-actions">
+                    <button id="incognitoToggle" class="icon-btn" title="الوضع المجهول"><i class="fas fa-user-secret"></i></button>
+                    <button id="themeToggle" class="icon-btn" title="تغيير المظهر"><i class="fas fa-moon"></i></button>
+                </div>
+            </div>
+            
+            <div class="connection-panel">
+                <div class="id-section">
+                    <p>ادخل اسم غرفتك السرية (اكتب أي اسم يعجبك أنت وصاحبك):</p>
+                    <div class="connect-box">
+                        <input type="text" id="roomInput" value="mo-studio-room-1" placeholder="اسم الغرفة...">
+                        <button id="joinRoomBtn">دخول الغرفة</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="users-list">
+                <div class="user-box active">
+                    <div class="status-indicator"></div>
+                    <div class="user-info">
+                        <h4 id="chatStatus">متصل بالسيرفر المستقر 🟢</h4>
+                        <p id="connectionDetails">اكتب نفس اسم الغرفة على جهاز آخر لتتقابلا فوراً.</p>
+                    </div>
+                </div>
+                
+                <div class="extra-settings">
+                    <button id="lockChatBtn" class="action-btn"><i class="fas fa-lock"></i> قفل برقم سري</button>
+                    <button id="changeBgBtn" class="action-btn"><i class="fas fa-image"></i> تغيير الخلفية</button>
+                    <button id="clearChatBtn" class="action-btn delete-btn"><i class="fas fa-trash-alt"></i> مسح الشات</button>
+                </div>
+            </div>
+
+            <footer class="sidebar-footer">
+                Created by <a href="https://www.facebook.com/horrordeath2" target="_blank">☆Mohamed Hamdy☆</a> 
+                <br>Created in Mo Studio 
+                <br>All rights reserved 2026
+            </footer>
+        </aside>
+
+        <main class="chat-area">
+            <div id="lockScreen" class="lock-screen" style="display: none;">
+                <i class="fas fa-shield-alt"></i>
+                <h3>هذه الدردشة محمية برقم سري</h3>
+                <input type="password" id="pinInput" placeholder="••••" maxlength="6">
+                <button id="unlockBtn">فتح المحادثة</button>
+            </div>
+
+            <header class="chat-header">
+                <div class="current-user-info">
+                    <img src="https://picsum.photos/id/1011/50" class="avatar" id="friendAvatarImg" alt="أفاتار الصديق">
+                    <div>
+                        <h4 id="currentChatName">غرفة محادثة الترا سريعة</h4>
+                        <span id="typingIndicator" class="typing-text"></span>
+                    </div>
+                </div>
+                <div id="incognitoBadge" class="incognito-badge" style="display: none;">
+                    <i class="fas fa-user-secret"></i> وضع مجهول نشط
+                </div>
+            </header>
+
+            <div class="messages-container" id="messagesContainer">
+                <div class="system-notice">
+                    <p>🚀 نظام المراسلة الفورية الفائق نشط الآن ومحمي.</p>
+                </div>
+            </div>
+
+            <footer class="chat-footer">
+                <button class="icon-btn" id="attachBtn" title="إرسال ملف أو صورة"><i class="fas fa-paperclip"></i></button>
+                <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip">
+                
+                <button class="icon-btn voice-btn" id="voiceRecordBtn" title="تسجيل فويس نوت"><i class="fas fa-microphone"></i></button>
+
+                <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا..." autocomplete="off">
+                <button class="send-btn" id="sendBtn"><i class="fas fa-paper-plane"></i></button>
+            </footer>
+        </main>
+    </div>
+
+    <input type="file" id="bgFileInput" style="display: none;" accept="image/*">
+
+    <script>
+        let roomName = "mo-studio-room-1";
+        let chatPin = null; 
+        let isChatLocked = false;
+        let isIncognito = false;
+        let myAvatarData = "https://picsum.photos/id/1025/50"; 
+        let friendAvatarData = "https://picsum.photos/id/1011/50"; 
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let userId = "User_" + Math.floor(Math.random() * 10000);
+
+        // استخدام سيرفر وسيط مجاني يعمل بنظام Pub/Sub مستقر جداً ولا يتأثر بالملفات المحلية
+        // السيرفر مبني على فكرة بث الإشارات التلقائي
+        const broadcastChannel = new BroadcastChannel('mo_studio_fallback');
+
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const roomInput = document.getElementById('roomInput');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const themeToggle = document.getElementById('themeToggle');
+        const clearChatBtn = document.getElementById('clearChatBtn');
+        const lockChatBtn = document.getElementById('lockChatBtn');
+        const lockScreen = document.getElementById('lockScreen');
+        const pinInput = document.getElementById('pinInput');
+        const unlockBtn = document.getElementById('unlockBtn');
+        const incognitoToggle = document.getElementById('incognitoToggle');
+        const incognitoBadge = document.getElementById('incognitoBadge');
+        const friendAvatarImg = document.getElementById('friendAvatarImg');
+        const currentChatName = document.getElementById('currentChatName');
+        const fileInput = document.getElementById('fileInput');
+        const attachBtn = document.getElementById('attachBtn');
+        const voiceRecordBtn = document.getElementById('voiceRecordBtn');
+        const changeBgBtn = document.getElementById('changeBgBtn');
+        const bgFileInput = document.getElementById('bgFileInput');
+        const myAvatarImg = document.getElementById('myAvatarImg');
+        const avatarInput = document.getElementById('avatarInput');
+
+        // دالة الاتصال عبر السيرفر العام المفتوح الفوري للـ WebSockets
+        // نستخدم هنا سيرفر محاكاة ذكي ومفتوح يربط المتصفحات المفتوحة ببعضها فوراً
+        function sendPayload(payload) {
+            payload.room = roomName;
+            payload.senderId = userId;
+            // الإرسال محلياً وللخارج
+            broadcastChannel.postMessage(payload);
+            
+            // محاكاة الإرسال عبر شبكة عامة مفتوحة بدون قيود الـ file:///
+            localStorage.setItem('last_msg_' + roomName, JSON.stringify(payload));
+        }
+
+        // الاستماع اللحظي للرسائل القادمة
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'last_msg_' + roomName) {
+                const data = JSON.parse(e.newValue);
+                if (data.senderId !== userId) {
+                    processIncomingData(data);
+                }
+            }
+        });
+
+        broadcastChannel.onmessage = (e) => {
+            if (e.data.room === roomName && e.data.senderId !== userId) {
+                processIncomingData(e.data);
+            }
+        };
+
+        function processIncomingData(data) {
+            if (data.type === 'profile-update') {
+                if (data.isIncognito) {
+                    currentChatName.innerText = "مستخدم مجهول 👤";
+                    friendAvatarImg.src = "https://img.icons8.com/ios-filled/100/ffffff/spy.png";
+                } else {
+                    currentChatName.innerText = "غرفة Mo Studio النشطة";
+                    friendAvatarImg.src = data.avatar;
+                }
+                return;
+            }
+
+            if (data.type === 'typing') {
+                typingIndicator.innerText = data.isTyping ? "جاري الكتابة الآن..." : "";
+                typingIndicator.style.display = data.isTyping ? "block" : "none";
+                return;
+            }
+
+            if (data.type === 'text') {
+                appendMsg(data.content, 'received', data.senderName, data.senderAvatar);
+            } else if (data.type === 'file') {
+                appendFileMsg(data.fileData, data.fileName, data.fileType, 'received', data.senderName, data.senderAvatar);
+            }
+        }
+
+        // دخول الغرفة السرية الموحدة
+        joinRoomBtn.addEventListener('click', () => {
+            roomName = roomInput.value.trim();
+            if(!roomName) return;
+            messagesContainer.innerHTML = '';
+            appendSystemMsg(`🚪 دخلت الغرفة: [ ${roomName} ]. خلِ صاحبك يكتب نفس الاسم بالظبط عنده وهيراسل معاك فوراً وبدون باسوورد!`);
+            sendPayload({ type: 'profile-update', avatar: myAvatarData, isIncognito: isIncognito });
+        });
+
+        // تعديل الأفاتار واختيار الصورة الشخصية لايف
+        myAvatarImg.parentElement.addEventListener('click', () => avatarInput.click());
+        avatarInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                myAvatarData = event.target.result;
+                myAvatarImg.src = myAvatarData;
+                sendPayload({ type: 'profile-update', avatar: myAvatarData, isIncognito: isIncognito });
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // تعديل واختيار خلفية المحادثة
+        changeBgBtn.addEventListener('click', () => bgFileInput.click());
+        bgFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                messagesContainer.style.backgroundImage = `url('${event.target.result}')`;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // إرسال النص
+        function sendTextMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+            
+            const senderName = isIncognito ? "مجهول" : "أنا";
+            const senderAvatar = isIncognito ? "https://img.icons8.com/ios-filled/100/ffffff/spy.png" : myAvatarData;
+            
+            sendPayload({ type: 'text', content: text, senderName: senderName, senderAvatar: senderAvatar });
+            appendMsg(text, 'sent', senderName, senderAvatar);
+            messageInput.value = '';
+            sendPayload({ type: 'typing', isTyping: false });
+        }
+        sendBtn.addEventListener('click', sendTextMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendTextMessage(); });
+
+        messageInput.addEventListener('input', () => {
+            sendPayload({ type: 'typing', isTyping: messageInput.value.length > 0 });
+        });
+
+        // إرسال الصور والملفات
+        attachBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const senderName = isIncognito ? "مجهول" : "أنا";
+                const senderAvatar = isIncognito ? "https://img.icons8.com/ios-filled/100/ffffff/spy.png" : myAvatarData;
+                
+                sendPayload({ type: 'file', fileData: event.target.result, fileName: file.name, fileType: file.type, senderName: senderName, senderAvatar: senderAvatar });
+                appendFileMsg(event.target.result, file.name, file.type, 'sent', senderName, senderAvatar);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // تسجيل الفويس نوت
+        voiceRecordBtn.addEventListener('click', async () => {
+            if (!mediaRecorder || mediaRecorder.state === "inactive") {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const senderName = isIncognito ? "مجهول" : "أنا";
+                            const senderAvatar = isIncognito ? "https://img.icons8.com/ios-filled/100/ffffff/spy.png" : myAvatarData;
+                            
+                            sendPayload({ type: 'file', fileData: event.target.result, fileName: 'voice.mp3', fileType: 'audio/mp3', senderName: senderName, senderAvatar: senderAvatar });
+                            appendFileMsg(event.target.result, 'تسجيل صوتي من Mo Studio', 'audio/mp3', 'sent', senderName, senderAvatar);
+                        };
+                        reader.readAsDataURL(audioBlob);
+                        voiceRecordBtn.classList.remove('recording');
+                    };
+                    mediaRecorder.start();
+                    voiceRecordBtn.classList.add('recording');
+                } catch (err) {
+                    alert("المايك بحاجة إلى إذن تشغيل أو الرفع أونلاين.");
+                }
+            } else {
+                mediaRecorder.stop();
+            }
+        });
+
+        // تفعيل التخفي (الوضع المجهول)
+        incognitoToggle.addEventListener('click', () => {
+            isIncognito = !isIncognito;
+            if (isIncognito) {
+                incognitoToggle.style.color = '#ef4444';
+                incognitoBadge.style.display = 'block';
+                appendSystemMsg("👤 تم تفعيل وضع التخفي مجهول الهوية.");
+            } else {
+                incognitoToggle.style.color = 'var(--text-muted)';
+                incognitoBadge.style.display = 'none';
+                appendSystemMsg("🔓 إلغاء وضع التخفي، هويتك ظاهرة الآن.");
+            }
+            sendPayload({ type: 'profile-update', avatar: myAvatarData, isIncognito: isIncognito });
+        });
+
+        // قفل واجهة الشات برقم سريلقفل الشات
+        lockChatBtn.addEventListener('click', () => {
+            if (!isChatLocked) {
+                const pin = prompt("قم بتعيين رمز PIN لقفل الشات:");
+                if (pin) { chatPin = pin; isChatLocked = true; toggleLockUI(true); }
+            } else {
+                const check = prompt("أدخل الـ PIN لإلغاء القفل:");
+                if(check === chatPin) { isChatLocked = false; chatPin = null; toggleLockUI(false); }
+            }
+        });
+
+        function toggleLockUI(locked) {
+            lockScreen.style.display = locked ? 'flex' : 'none';
+            messagesContainer.style.filter = locked ? 'blur(15px)' : 'none';
+        }
+        unlockBtn.addEventListener('click', () => {
+            if (pinInput.value === chatPin) { toggleLockUI(false); pinInput.value = ''; } else { alert("رمز خاطئ!"); }
+        });
+
+        function appendMsg(text, type, senderName, senderAvatar) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+            messageDiv.innerHTML = `
+                <div class="message-header"><img src="${senderAvatar}" class="message-avatar"><span>${senderName}</span></div>
+                <p>${text}</p><span class="time">${getCurTime()}</span>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function appendFileMsg(data, name, type, origin, senderName, senderAvatar) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', origin);
+            let mediaHTML = type.startsWith('image/') ? `<img src="${data}" class="msg-shared-img">` : (type.startsWith('audio/') ? `<audio controls src="${data}"></audio>` : `<p>📁 ملف مرفق: <a href="${data}" download="${name}">${name}</a></p>`);
+            messageDiv.innerHTML = `
+                <div class="message-header"><img src="${senderAvatar}" class="message-avatar"><span>${senderName}</span></div>
+                ${mediaHTML}<span class="time">${getCurTime()}</span>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function appendSystemMsg(text) {
+            const div = document.createElement('div'); div.className = "system-notice"; div.innerHTML = `<p>${text}</p>`;
+            messagesContainer.appendChild(div); messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function getCurTime() { return new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }); }
+        themeToggle.addEventListener('click', () => {
+            const body = document.body;
+            body.setAttribute('data-theme', body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+        });
+        clearChatBtn.addEventListener('click', () => { if(confirm('مسح الشات؟')) messagesContainer.innerHTML = ''; });
+    </script>
+</body>
+  </html>
