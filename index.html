@@ -60,7 +60,8 @@
         
         .users-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; justify-content: space-between; }
         .user-box { display: flex; align-items: center; gap: 15px; padding: 20px; border-bottom: 1px solid var(--border-color); }
-        .status-indicator { width: 12px; height: 12px; border-radius: 50%; background: #22c55e; }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; background: #e2e8f0; transition: 0.3s; }
+        .status-indicator.connected { background: #22c55e; }
         
         .extra-settings { padding: 15px; display: flex; flex-wrap: wrap; gap: 8px; }
         .action-btn { flex: 1; min-width: 90px; padding: 10px 5px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-main); border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; }
@@ -138,9 +139,9 @@
 
             <div class="users-list">
                 <div class="user-box active">
-                    <div class="status-indicator"></div>
+                    <div id="statusIndicator" class="status-indicator"></div>
                     <div class="user-info">
-                        <h4 id="chatStatus">متصل بالسيرفر المستقر 🟢</h4>
+                        <h4 id="chatStatus">جاري الاتصال بالسيرفر... ⏳</h4>
                         <p id="connectionDetails">اكتب نفس اسم الغرفة على جهاز آخر لتتقابلا فوراً.</p>
                     </div>
                 </div>
@@ -210,10 +211,7 @@
         let mediaRecorder = null;
         let audioChunks = [];
         let userId = "User_" + Math.floor(Math.random() * 10000);
-
-        // استخدام سيرفر وسيط مجاني يعمل بنظام Pub/Sub مستقر جداً ولا يتأثر بالملفات المحلية
-        // السيرفر مبني على فكرة بث الإشارات التلقائي
-        const broadcastChannel = new BroadcastChannel('mo_studio_fallback');
+        let socket = null;
 
         const joinRoomBtn = document.getElementById('joinRoomBtn');
         const roomInput = document.getElementById('roomInput');
@@ -238,34 +236,56 @@
         const bgFileInput = document.getElementById('bgFileInput');
         const myAvatarImg = document.getElementById('myAvatarImg');
         const avatarInput = document.getElementById('avatarInput');
+        const chatStatus = document.getElementById('chatStatus');
+        const statusIndicator = document.getElementById('statusIndicator');
 
-        // دالة الاتصال عبر السيرفر العام المفتوح الفوري للـ WebSockets
-        // نستخدم هنا سيرفر محاكاة ذكي ومفتوح يربط المتصفحات المفتوحة ببعضها فوراً
-        function sendPayload(payload) {
-            payload.room = roomName;
-            payload.senderId = userId;
-            // الإرسال محلياً وللخارج
-            broadcastChannel.postMessage(payload);
-            
-            // محاكاة الإرسال عبر شبكة عامة مفتوحة بدون قيود الـ file:///
-            localStorage.setItem('last_msg_' + roomName, JSON.stringify(payload));
+        // دالة ربط وإنشاء اتصال الـ WebSocket الحقيقي عبر سيرفر PieSocket العام والمفتوح
+        function initWebSocket() {
+            if (socket) {
+                socket.close();
+            }
+
+            // استخدام ديمو سيرفر مفتوح ومجاني يدعم غرف الشات المتعددة تلقائياً عبر الأجهزة المختلفة
+            const apiKey = "oZCDuTeatNTZg9YvYJg65v69bQ6vD78wJmS0m2U2"; 
+            const socketUrl = `wss://demo.piesocket.com/v3/${roomName}?api_key=${apiKey}&notify_self=0`;
+
+            socket = new WebSocket(socketUrl);
+
+            socket.onopen = () => {
+                chatStatus.innerText = "متصل بالسيرفر المفتوح 🟢";
+                statusIndicator.classList.add('connected');
+                // إرسال تحديث الحساب فور الاتصال
+                sendPayload({ type: 'profile-update', avatar: myAvatarData, isIncognito: isIncognito });
+            };
+
+            socket.onclose = () => {
+                chatStatus.innerText = "فصل الاتصال! جاري إعادة المحاولة... 🔴";
+                statusIndicator.classList.remove('connected');
+                setTimeout(initWebSocket, 3000); // إعادة اتصال تلقائي في حال حدوث شبكة ضعيفة
+            };
+
+            socket.onerror = (error) => {
+                console.error("WebSocket Error: ", error);
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.senderId !== userId) {
+                        processIncomingData(data);
+                    }
+                } catch (e) {
+                    console.log("استقبلت رسالة غير منسقة.");
+                }
+            };
         }
 
-        // الاستماع اللحظي للرسائل القادمة
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'last_msg_' + roomName) {
-                const data = JSON.parse(e.newValue);
-                if (data.senderId !== userId) {
-                    processIncomingData(data);
-                }
+        function sendPayload(payload) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                payload.senderId = userId;
+                socket.send(JSON.stringify(payload));
             }
-        });
-
-        broadcastChannel.onmessage = (e) => {
-            if (e.data.room === roomName && e.data.senderId !== userId) {
-                processIncomingData(e.data);
-            }
-        };
+        }
 
         function processIncomingData(data) {
             if (data.type === 'profile-update') {
@@ -292,13 +312,17 @@
             }
         }
 
-        // دخول الغرفة السرية الموحدة
+        // بدء تشغيل الاتصال فور فتح الصفحة
+        initWebSocket();
+
+        // دخول الغرفة السرية الموحدة وتحديث السيرفر
         joinRoomBtn.addEventListener('click', () => {
-            roomName = roomInput.value.trim();
-            if(!roomName) return;
+            const inputRoom = roomInput.value.trim();
+            if(!inputRoom) return;
+            roomName = inputRoom;
             messagesContainer.innerHTML = '';
-            appendSystemMsg(`🚪 دخلت الغرفة: [ ${roomName} ]. خلِ صاحبك يكتب نفس الاسم بالظبط عنده وهيراسل معاك فوراً وبدون باسوورد!`);
-            sendPayload({ type: 'profile-update', avatar: myAvatarData, isIncognito: isIncognito });
+            appendSystemMsg(`🚪 تحولت إلى الغرفة: [ ${roomName} ]. جاري ربط الأجهزة...`);
+            initWebSocket();
         });
 
         // تعديل الأفاتار واختيار الصورة الشخصية لايف
@@ -343,8 +367,13 @@
         sendBtn.addEventListener('click', sendTextMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendTextMessage(); });
 
+        let typingTimeout;
         messageInput.addEventListener('input', () => {
-            sendPayload({ type: 'typing', isTyping: messageInput.value.length > 0 });
+            sendPayload({ type: 'typing', isTyping: true });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                sendPayload({ type: 'typing', isTyping: false });
+            }, 1500);
         });
 
         // إرسال الصور والملفات
@@ -352,6 +381,13 @@
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
+            
+            // تنبيه لحجم الملف لحماية استقرار السيرفر المجاني البسيط
+            if (file.size > 2 * 1024 * 1024) {
+                alert("السيرفر المجاني يدعم ملفات حتى 2 ميجا فقط لضمان السرعة.");
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(event) {
                 const senderName = isIncognito ? "مجهول" : "أنا";
@@ -387,7 +423,7 @@
                     mediaRecorder.start();
                     voiceRecordBtn.classList.add('recording');
                 } catch (err) {
-                    alert("المايك بحاجة إلى إذن تشغيل أو الرفع أونلاين.");
+                    alert("المايك بحاجة إلى إذن تشغيل لتسجيل الصوت.");
                 }
             } else {
                 mediaRecorder.stop();
@@ -409,7 +445,7 @@
             sendPayload({ type: 'profile-update', avatar: myAvatarData, isIncognito: isIncognito });
         });
 
-        // قفل واجهة الشات برقم سريلقفل الشات
+        // قفل واجهة الشات برقم سري
         lockChatBtn.addEventListener('click', () => {
             if (!isChatLocked) {
                 const pin = prompt("قم بتعيين رمز PIN لقفل الشات:");
@@ -464,4 +500,4 @@
         clearChatBtn.addEventListener('click', () => { if(confirm('مسح الشات؟')) messagesContainer.innerHTML = ''; });
     </script>
 </body>
-  </html>
+</html>
